@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Tetris Ultimate - TST & Pause</title>
+    <title>Tetris Ultimate - TST Fixed</title>
     <style>
         body { background: #0f0f13; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
         .game-container { display: flex; gap: 30px; align-items: flex-start; position: relative; }
@@ -20,7 +20,7 @@
 </head>
 <body>
     <div id="pause-overlay">PAUSED<div style="font-size: 16px; margin-top: 10px;">Press ESC to Resume</div></div>
-    <div id="message-log">T-SPIN TRIPLE!</div>
+    <div id="message-log"></div>
     <div class="game-container">
         <div class="side-panel">
             <div class="box">
@@ -68,7 +68,7 @@
         const colors = [null, '#00FFFF', '#FFFF00', '#800080', '#00FF00', '#FF0000', '#0000FF', '#FF7F00'];
         let paused = false;
 
-        // SRS Wall Kick Data (TSTに必要な高度なキックパターンを含む)
+        // SRS 完全版 (TST対応: Kick 5 までの全座標)
         const srsData = {
             '0-1':[[0,0],[-1,0],[-1,1],[0,-2],[-1,-2]], '1-0':[[0,0],[1,0],[1,-1],[0,2],[1,2]],
             '1-2':[[0,0],[1,0],[1,-1],[0,2],[1,2]], '2-1':[[0,0],[-1,0],[-1,1],[0,-2],[-1,-2]],
@@ -150,7 +150,7 @@
         function showMessage(text) {
             msgLog.innerText = text;
             msgLog.style.opacity = 1;
-            setTimeout(() => { msgLog.style.opacity = 0; }, 1000);
+            setTimeout(() => { if(msgLog.innerText === text) msgLog.style.opacity = 0; }, 1000);
         }
 
         function arenaSweep() {
@@ -224,22 +224,35 @@
             const endRot = (startRot + dir + 4) % 4;
             const matrixBackup = player.matrix.map(row => [...row]);
             rotate(player.matrix, dir);
+            
             const key = `${startRot}-${endRot}`;
             const kicks = (player.currentType === 'I') ? srsDataI[key] : srsData[key];
+            
             let success = false;
             for (let i = 0; i < (kicks ? kicks.length : 1); i++) {
                 const [dx, dy] = kicks ? kicks[i] : [0,0];
-                player.pos.x += dx; player.pos.y -= dy;
-                if (!collide(arena, player)) { success = true; player.rotation = endRot; break; }
-                player.pos.x -= dx; player.pos.y += dy;
+                player.pos.x += dx; 
+                player.pos.y -= dy; // SRSデータは上がプラスなので符号反転
+                if (!collide(arena, player)) { 
+                    success = true; 
+                    player.rotation = endRot; 
+                    break; 
+                }
+                player.pos.x -= dx; 
+                player.pos.y += dy;
             }
-            if (!success) player.matrix = matrixBackup;
-            else player.lastMoveWasSpin = checkSpin(arena, player);
+
+            if (!success) {
+                player.matrix = matrixBackup;
+            } else {
+                player.lastMoveWasSpin = checkSpin(arena, player);
+            }
         }
 
         function checkSpin(arena, player) {
             if (player.currentType === 'T') {
                 let corners = 0;
+                // ミノの3x3範囲の四隅をチェック
                 [{x:0,y:0},{x:2,y:0},{x:0,y:2},{x:2,y:2}].forEach(p => {
                     const cx = player.pos.x + p.x, cy = player.pos.y + p.y;
                     if (cy >= 20 || cy < 0 || cx < 0 || cx >= 10 || arena[cy][cx] !== 0) corners++;
@@ -292,7 +305,7 @@
                 const tempType = holdPieceType;
                 holdPiece = createPiece(currentType); holdPieceType = currentType;
                 player.currentType = tempType; player.matrix = createPiece(tempType);
-                player.rotation = 0; player.pos.y = 0; player.pos.x = 4;
+                player.rotation = 0; player.pos.y = 0; player.pos.x = 3;
             }
             canHold = false;
         }
@@ -304,7 +317,7 @@
             player.rotation = 0;
             nextPieceType = getNextFromBag();
             player.pos.y = 0;
-            player.pos.x = 4; // 出現位置をさらに右へ
+            player.pos.x = 3; // ここを前の位置(3)に戻したよ
             if (collide(arena, player)) {
                 arena.forEach(row => row.fill(0));
                 player.score = 0; player.level = 1; player.b2b = false; player.ren = -1;
@@ -330,18 +343,14 @@
 
         let dropCounter = 0, dropInterval = 1000, lastTime = 0;
 
-        // キー管理用のオブジェクト (長押し対応)
         const keys = {};
         window.addEventListener('keydown', e => {
-            if (e.keyCode === 27) togglePause(); // ESCでポーズ
+            if (e.keyCode === 27) togglePause();
             if (paused && e.keyCode !== 27) return;
 
-            // スペースキー(32)は初回のみ反応させる
-            if (e.keyCode === 32 && !keys[32]) hardDrop();
-            
+            if (e.keyCode === 32 && !keys[32]) { e.preventDefault(); hardDrop(); }
             keys[e.keyCode] = true;
 
-            // その他の単発入力
             if (e.keyCode === 37) playerMove(-1);
             if (e.keyCode === 39) playerMove(1);
             if (e.keyCode === 38) playerRotate(1);
@@ -355,16 +364,11 @@
             lastTime = time;
 
             if (!paused) {
-                // ソフトドロップ (↓キー長押し)
-                if (keys[40]) {
-                    dropCounter += deltaTime * 10; // 10倍速
-                } else {
-                    dropCounter += deltaTime;
-                }
+                if (keys[40]) dropCounter += deltaTime * 15;
+                else dropCounter += deltaTime;
 
                 if (dropCounter > dropInterval) playerDrop();
             }
-
             draw();
             requestAnimationFrame(update);
         }
