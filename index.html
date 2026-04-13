@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Tetris Ultimate - TST Final Fix</title>
+    <title>Tetris Ultimate - TST FIXED</title>
     <style>
         body { background: #0f0f13; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
         .game-container { display: flex; gap: 30px; align-items: flex-start; position: relative; }
@@ -17,11 +17,8 @@
         
         #pause-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
         .pause-title { font-size: 40px; font-weight: bold; margin-bottom: 20px; }
-        .menu-btn { background: #444; border: 2px solid #666; color: white; padding: 10px 30px; cursor: pointer; font-size: 18px; border-radius: 5px; min-width: 150px; margin: 5px; }
 
         #message-log { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); pointer-events: none; font-size: 36px; font-weight: bold; color: #fff; text-shadow: 0 0 10px #ff0, 2px 2px #000; opacity: 0; transition: opacity 0.1s; z-index: 10; width: 400px; text-align: center; }
-        .b2b-text { color: #ff9800; font-style: italic; font-size: 14px; margin-top: 5px; display: none; }
-        .ren-text { color: #4caf50; font-weight: bold; font-size: 18px; margin-top: 5px; display: none; }
         canvas.small { background: #050505; margin-top: 5px; border-radius: 2px; }
     </style>
 </head>
@@ -29,16 +26,13 @@
     <div id="ui-layer"><button class="btn" onclick="togglePause()">PAUSE (ESC)</button></div>
     <div id="pause-overlay">
         <div class="pause-title">PAUSED</div>
-        <button class="menu-btn" onclick="togglePause()">RESUME</button>
-        <button class="menu-btn" style="color:#f44336;" onclick="location.reload()">QUIT</button>
+        <button onclick="togglePause()" style="padding:10px 20px; cursor:pointer;">RESUME</button>
     </div>
     <div id="message-log"></div>
     <div class="game-container">
         <div class="side-panel">
             <div class="box"><div class="label">HOLD</div><canvas id="hold" class="small" width="80" height="80"></canvas></div>
             <div class="box"><div class="label">LEVEL</div><div id="level" class="value">1</div></div>
-            <div id="b2b-indicator" class="b2b-text">BACK TO BACK</div>
-            <div id="ren-indicator" class="ren-text">0 REN</div>
         </div>
         <canvas id="tetris" width="200" height="400"></canvas>
         <div class="side-panel">
@@ -55,8 +49,6 @@
         const nextCanvas = document.getElementById('next');
         const nCtx = nextCanvas.getContext('2d');
         const msgLog = document.getElementById('message-log');
-        const b2bInd = document.getElementById('b2b-indicator');
-        const renInd = document.getElementById('ren-indicator');
         const pauseOverlay = document.getElementById('pause-overlay');
 
         context.scale(20, 20);
@@ -66,8 +58,8 @@
         const colors = [null, '#00FFFF', '#FFFF00', '#800080', '#00FF00', '#FF0000', '#0000FF', '#FF7F00'];
         let paused = false;
 
-        // SRS Wall Kick Tables
-        const kicksNormal = {
+        // 本家準拠 SRS キックデータ
+        const srsOffsets = {
             '0-1': [[0,0], [-1,0], [-1,1], [0,-2], [-1,-2]],
             '1-0': [[0,0], [1,0], [1,-1], [0,2], [1,2]],
             '1-2': [[0,0], [1,0], [1,-1], [0,2], [1,2]],
@@ -77,7 +69,8 @@
             '3-0': [[0,0], [-1,0], [-1,1], [0,-2], [-1,-2]],
             '0-3': [[0,0], [1,0], [1,-1], [0,2], [1,2]]
         };
-        const kicksI = {
+
+        const srsOffsetsI = {
             '0-1': [[0,0], [-2,0], [1,0], [-2,-1], [1,2]],
             '1-0': [[0,0], [2,0], [-1,0], [2,1], [-1,-2]],
             '1-2': [[0,0], [-1,0], [2,0], [-1,2], [2,-1]],
@@ -99,11 +92,11 @@
         }
 
         let bag = [];
-        function getNextFromBag() {
+        function getNext() {
             if (bag.length === 0) {
-                bag = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
-                for (let i = bag.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
+                bag = ['I','J','L','O','S','T','Z'];
+                for(let i=bag.length-1; i>0; i--) {
+                    const j = Math.floor(Math.random()*(i+1));
                     [bag[i], bag[j]] = [bag[j], bag[i]];
                 }
             }
@@ -111,188 +104,141 @@
         }
 
         const arena = Array.from({length: 20}, () => Array(10).fill(0));
-        const player = { pos: {x: 3, y: 0}, matrix: null, score: 0, level: 1, currentType: null, b2b: false, lastMoveWasSpin: false, rotation: 0, ren: -1 };
-
-        function draw() {
-            context.fillStyle = '#000';
-            context.fillRect(0, 0, canvas.width, canvas.height);
-            context.strokeStyle = '#1a1a1a';
-            context.lineWidth = 0.05;
-            for(let x=0; x<10; x++) for(let y=0; y<20; y++) context.strokeRect(x, y, 1, 1);
-            const ghostPos = getGhostPosition();
-            context.globalAlpha = 0.2;
-            drawMatrix(player.matrix, ghostPos, context);
-            context.globalAlpha = 1;
-            drawMatrix(arena, {x:0, y:0}, context);
-            drawMatrix(player.matrix, player.pos, context);
-            hCtx.fillStyle = '#050505'; hCtx.fillRect(0,0,80,80);
-            if(holdPiece) drawMatrix(holdPiece, {x:0,y:0}, hCtx);
-            nCtx.fillStyle = '#050505'; nCtx.fillRect(0,0,80,80);
-            if(nextPieceType) drawMatrix(createPiece(nextPieceType), {x:0,y:0}, nCtx);
-        }
-
-        function getGhostPosition() {
-            let ghostY = player.pos.y;
-            while(!collide(arena, {...player, pos: {x: player.pos.x, y: ghostY+1}})) ghostY++;
-            return {x: player.pos.x, y: ghostY};
-        }
-
-        function drawMatrix(m, o, ctx) {
-            m.forEach((row, y) => row.forEach((v, x) => {
-                if(v !== 0) {
-                    ctx.fillStyle = colors[v];
-                    ctx.fillRect(x + o.x, y + o.y, 1, 1);
-                    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-                    ctx.strokeRect(x + o.x, y + o.y, 1, 1);
-                }
-            }));
-        }
-
-        function collide(arena, p) {
-            const [m, o] = [p.matrix, p.pos];
-            for(let y=0; y<m.length; ++y) for(let x=0; x<m[y].length; ++x) {
-                if(m[y][x] !== 0 && (arena[y+o.y] === undefined || arena[y+o.y][x+o.x] === undefined || arena[y+o.y][x+o.x] !== 0)) return true;
-            }
-            return false;
-        }
-
-        function rotate(matrix, dir) {
-            for(let y=0; y<matrix.length; ++y) for(let x=0; x<y; ++x) [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
-            if(dir > 0) matrix.forEach(row => row.reverse()); else matrix.reverse();
-        }
+        const player = { pos: {x: 3, y: 0}, matrix: null, type: null, rotation: 0, lastSpin: false };
 
         function playerRotate(dir) {
-            if(paused) return;
             const startRot = player.rotation;
             const endRot = (startRot + dir + 4) % 4;
-            const backup = player.matrix.map(row => [...row]);
-            rotate(player.matrix, dir);
-            const key = `${startRot}-${endRot}`;
-            const kicks = (player.currentType === 'I') ? kicksI[key] : kicksNormal[key];
-            let success = false;
-            for(let i=0; i<kicks.length; i++) {
-                const [dx, dy] = kicks[i];
-                player.pos.x += dx; player.pos.y -= dy;
-                if(!collide(arena, player)) { success = true; player.rotation = endRot; break; }
-                player.pos.x -= dx; player.pos.y += dy;
+            const backup = player.matrix.map(r => [...r]);
+            
+            // 回転行列
+            for(let y=0; y<player.matrix.length; ++y) {
+                for(let x=0; x<y; ++x) [player.matrix[x][y], player.matrix[y][x]] = [player.matrix[y][x], player.matrix[x][y]];
             }
-            if(!success) player.matrix = backup;
-            else player.lastMoveWasSpin = checkSpin(arena, player);
+            if(dir > 0) player.matrix.forEach(row => row.reverse()); else player.matrix.reverse();
+
+            // SRSチェック
+            const key = `${startRot}-${endRot}`;
+            const kicks = (player.type === 'I') ? srsOffsetsI[key] : srsOffsets[key];
+            
+            let success = false;
+            for (let i = 0; i < (kicks ? kicks.length : 1); i++) {
+                const [dx, dy] = kicks ? kicks[i] : [0,0];
+                player.pos.x += dx;
+                player.pos.y -= dy; // SRSデータは上が正なので反転
+                if (!collide(arena, player)) {
+                    success = true;
+                    player.rotation = endRot;
+                    break;
+                }
+                player.pos.x -= dx;
+                player.pos.y += dy;
+            }
+
+            if (!success) {
+                player.matrix = backup;
+            } else {
+                player.lastSpin = checkTSpin(arena, player);
+            }
         }
 
-        function checkSpin(arena, player) {
-            if(player.currentType !== 'T') return false;
+        function checkTSpin(arena, player) {
+            if (player.type !== 'T') return false;
             let corners = 0;
-            [{x:0,y:0},{x:2,y:0},{x:0,y:2},{x:2,y:2}].forEach(p => {
+            const checkPoints = [{x:0,y:0},{x:2,y:0},{x:0,y:2},{x:2,y:2}];
+            checkPoints.forEach(p => {
                 const cx = player.pos.x + p.x, cy = player.pos.y + p.y;
-                if(cy < 0 || cy >= 20 || cx < 0 || cx >= 10 || arena[cy][cx] !== 0) corners++;
+                if (cy < 0 || cy >= 20 || cx < 0 || cx >= 10 || arena[cy][cx] !== 0) corners++;
             });
             return corners >= 3;
         }
 
+        function collide(arena, p) {
+            const [m, o] = [p.matrix, p.pos];
+            for (let y = 0; y < m.length; ++y) {
+                for (let x = 0; x < m[y].length; ++x) {
+                    if (m[y][x] !== 0 && (arena[y+o.y] === undefined || arena[y+o.y][x+o.x] === undefined || arena[y+o.y][x+o.x] !== 0)) return true;
+                }
+            }
+            return false;
+        }
+
         function arenaSweep() {
             let rowCount = 0;
-            outer: for(let y=arena.length-1; y>=0; --y) {
-                for(let x=0; x<arena[y].length; ++x) if(arena[y][x] === 0) continue outer;
-                arena.splice(y, 1); arena.unshift(new Array(10).fill(0));
+            outer: for (let y = arena.length - 1; y >= 0; y--) {
+                for (let x = 0; x < arena[y].length; x++) if (arena[y][x] === 0) continue outer;
+                arena.splice(y, 1);
+                arena.unshift(new Array(10).fill(0));
                 rowCount++; y++;
             }
-            if(rowCount > 0) {
-                player.ren++;
-                let msg = "";
-                if(player.lastMoveWasSpin) {
-                    msg = `T-SPIN ${["","SINGLE","DOUBLE","TRIPLE"][rowCount]}`;
-                    player.b2b = true;
-                } else if(rowCount === 4) {
-                    msg = "TETRIS";
-                    player.b2b = true;
-                } else {
-                    player.b2b = false;
-                }
-                if(msg) showMessage(`${player.b2b && msg !== "" ? "B2B " : ""}${msg}`);
-                player.score += rowCount * 100 * player.level;
-            } else player.ren = -1;
-            updateStats();
-        }
-
-        function playerDrop() {
-            if(paused) return;
-            player.pos.y++;
-            if(collide(arena, player)) {
-                player.pos.y--; merge(arena, player); playerReset(); arenaSweep(); canHold = true;
+            if (rowCount >= 4 || (player.lastSpin && rowCount > 0)) {
+                const type = player.lastSpin ? `T-SPIN ${["","SINGLE","DOUBLE","TRIPLE"][rowCount]}` : "TETRIS";
+                showMessage(type);
             }
-            dropCounter = 0;
-        }
-
-        function hardDrop() {
-            if(paused) return;
-            while(!collide(arena, player)) player.pos.y++;
-            player.pos.y--; merge(arena, player); playerReset(); arenaSweep(); canHold = true;
-        }
-
-        function merge(arena, player) {
-            player.matrix.forEach((row, y) => row.forEach((v, x) => {
-                if(v !== 0) arena[y + player.pos.y][x + player.pos.x] = v;
-            }));
-        }
-
-        let holdPiece = null, holdPieceType = null, canHold = true, nextPieceType = null;
-        function playerHold() {
-            if(paused || !canHold) return;
-            const current = player.currentType;
-            if(!holdPiece) { holdPiece = createPiece(current); holdPieceType = current; playerReset(); }
-            else {
-                const tmp = holdPieceType; holdPiece = createPiece(current); holdPieceType = current;
-                player.currentType = tmp; player.matrix = createPiece(tmp);
-                player.pos.y = 0; player.pos.x = 3; player.rotation = 0;
-            }
-            canHold = false;
-        }
-
-        function playerReset() {
-            nextPieceType = nextPieceType || getNextFromBag();
-            player.currentType = nextPieceType;
-            player.matrix = createPiece(player.currentType);
-            nextPieceType = getNextFromBag();
-            player.pos.y = 0; player.pos.x = 3; player.rotation = 0;
-            if(collide(arena, player)) { arena.forEach(row => row.fill(0)); player.score = 0; }
         }
 
         function showMessage(t) { msgLog.innerText = t; msgLog.style.opacity = 1; setTimeout(() => msgLog.style.opacity = 0, 1000); }
-        function togglePause() { paused = !paused; pauseOverlay.style.display = paused ? 'flex' : 'none'; }
-        function updateStats() {
-            document.getElementById('score').innerText = player.score;
-            document.getElementById('level').innerText = player.level;
-            b2bInd.style.display = player.b2b ? 'block' : 'none';
-            renInd.innerText = `${player.ren > 0 ? player.ren : 0} REN`;
-            renInd.style.display = player.ren > 0 ? 'block' : 'none';
+
+        function playerReset() {
+            player.type = nextPieceType || getNext();
+            player.matrix = createPiece(player.type);
+            nextPieceType = getNext();
+            player.pos.y = 0; player.pos.x = 3; player.rotation = 0; player.lastSpin = false;
+            if (collide(arena, player)) arena.forEach(r => r.fill(0));
+        }
+
+        function drawMatrix(m, o, ctx) {
+            m.forEach((row, y) => row.forEach((v, x) => {
+                if(v !== 0) { ctx.fillStyle = colors[v]; ctx.fillRect(x+o.x, y+o.y, 1, 1); }
+            }));
+        }
+
+        function draw() {
+            context.fillStyle = '#000'; context.fillRect(0,0,10,20);
+            drawMatrix(arena, {x:0,y:0}, context);
+            drawMatrix(player.matrix, player.pos, context);
+            hCtx.fillStyle = '#000'; hCtx.fillRect(0,0,4,4);
+            if(holdPiece) drawMatrix(holdPiece, {x:0,y:0}, hCtx);
+            nCtx.fillStyle = '#000'; nCtx.fillRect(0,0,4,4);
+            if(nextPieceType) drawMatrix(createPiece(nextPieceType), {x:0,y:0}, nCtx);
+        }
+
+        let holdPiece = null, canHold = true, nextPieceType = null;
+        function playerHold() {
+            if(!canHold) return;
+            if(!holdPiece) { holdPiece = createPiece(player.type); playerReset(); }
+            else { const t = holdPiece; holdPiece = createPiece(player.type); player.matrix = t; player.pos.y = 0; player.pos.x = 3; }
+            canHold = false;
         }
 
         const keys = {};
         window.addEventListener('keydown', e => {
             if(e.keyCode === 27) togglePause();
             if(paused) return;
-            if(e.keyCode === 32 && !keys[32]) { e.preventDefault(); hardDrop(); }
+            if(e.keyCode === 32 && !keys[32]) hardDrop();
             keys[e.keyCode] = true;
-            if(e.keyCode === 37) player.pos.x--; if(collide(arena, player)) player.pos.x++;
-            if(e.keyCode === 39) player.pos.x++; if(collide(arena, player)) player.pos.x--;
-            if(e.keyCode === 38) playerRotate(1);
-            if(e.keyCode === 90) playerRotate(-1);
+            if(e.keyCode === 37) { player.pos.x--; if(collide(arena,player)) player.pos.x++; }
+            if(e.keyCode === 39) { player.pos.x++; if(collide(arena,player)) player.pos.x--; }
+            if(e.keyCode === 38) playerRotate(1); // ↑
+            if(e.keyCode === 90) playerRotate(-1); // Z
             if(e.keyCode === 67) playerHold();
         });
         window.addEventListener('keyup', e => keys[e.keyCode] = false);
 
-        let dropCounter = 0, dropInterval = 1000, lastTime = 0;
+        function hardDrop() { while(!collide(arena,player)) player.pos.y++; player.pos.y--; merge(); playerReset(); arenaSweep(); canHold = true; }
+        function merge() { player.matrix.forEach((r,y) => r.forEach((v,x) => { if(v!==0) arena[y+player.pos.y][x+player.pos.x] = v; })); }
+        function togglePause() { paused = !paused; pauseOverlay.style.display = paused ? 'flex' : 'none'; }
+
+        let dropCounter = 0, lastTime = 0;
         function update(time = 0) {
             const dt = time - lastTime; lastTime = time;
             if(!paused) {
                 dropCounter += keys[40] ? dt * 15 : dt;
-                if(dropCounter > dropInterval) playerDrop();
+                if(dropCounter > 1000) { player.pos.y++; if(collide(arena,player)){ player.pos.y--; merge(); playerReset(); arenaSweep(); canHold=true; } dropCounter=0; }
             }
             draw(); requestAnimationFrame(update);
         }
-
-        playerReset(); updateStats(); update();
+        playerReset(); update();
     </script>
 </body>
 </html>
