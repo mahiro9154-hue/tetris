@@ -2,30 +2,36 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Tetris Investment - High Stakes</title>
+    <title>Tetris Investment - Advanced Economy</title>
     <style>
         body { background: #0f0f13; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
         .game-container { display: flex; gap: 20px; align-items: flex-start; position: relative; }
         canvas { border: 4px solid #444; background-color: #000; box-shadow: 0 0 30px rgba(0,0,0,0.7); }
-        .side-panel { display: flex; flex-direction: column; gap: 8px; width: 150px; }
+        .side-panel { display: flex; flex-direction: column; gap: 8px; width: 160px; }
         .box { border: 2px solid #333; padding: 8px; background: rgba(34, 34, 34, 0.9); text-align: center; border-radius: 4px; }
         .label { font-size: 10px; color: #888; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }
         .value { font-size: 16px; font-weight: bold; color: #00d4ff; }
         .money { color: #ffeb3b; font-size: 18px; }
         
-        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 300; }
-        .menu-box { background: #222; padding: 30px; border-radius: 10px; border: 2px solid #444; text-align: center; width: 380px; max-height: 90vh; overflow-y: auto; }
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 300; }
+        .menu-box { background: #222; padding: 30px; border-radius: 10px; border: 2px solid #444; text-align: center; width: 420px; max-height: 90vh; overflow-y: auto; }
         
         .btn { background: #00d4ff; color: #000; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; font-size: 14px; font-weight: bold; transition: 0.2s; margin: 5px; }
         .btn:hover:not(:disabled) { background: #fff; transform: scale(1.05); }
         .btn:disabled { background: #444; color: #888; cursor: not-allowed; }
 
-        .shop-item { background: #333; margin: 8px 0; padding: 10px; border-radius: 5px; text-align: left; border-left: 4px solid #00d4ff; }
-        .shop-item h4 { margin: 0; font-size: 14px; }
-        .price { color: #ffeb3b; font-weight: bold; float: right; }
+        .tab-container { display: flex; gap: 5px; margin-bottom: 15px; }
+        .tab-btn { flex: 1; padding: 10px; background: #333; border: none; color: #888; cursor: pointer; border-radius: 5px 5px 0 0; }
+        .tab-btn.active { background: #444; color: #00d4ff; border-bottom: 2px solid #00d4ff; }
 
-        .speed-selector { display: flex; justify-content: center; gap: 10px; margin: 20px 0; }
-        .speed-btn { background: #333; border: 2px solid #555; color: #888; padding: 8px; cursor: pointer; border-radius: 5px; flex: 1; font-size: 12px; }
+        .shop-item { background: #333; margin: 8px 0; padding: 10px; border-radius: 5px; text-align: left; position: relative; }
+        .shop-item h4 { margin: 0; font-size: 14px; color: #fff; }
+        .shop-item p { margin: 5px 0 0; font-size: 10px; color: #aaa; }
+        .price { color: #ffeb3b; font-weight: bold; position: absolute; right: 10px; top: 10px; }
+        .equipped-tag { color: #00ff00; font-size: 10px; font-weight: bold; margin-left: 10px; }
+
+        .speed-selector { display: flex; gap: 5px; margin: 15px 0; }
+        .speed-btn { background: #333; border: 2px solid #555; color: #888; padding: 8px; cursor: pointer; border-radius: 5px; flex: 1; font-size: 11px; }
         .speed-btn.active { border-color: #00d4ff; color: #fff; background: #1a3a4a; }
 
         canvas.small { background: #050505; margin-top: 5px; border-radius: 2px; }
@@ -35,63 +41,78 @@
 
     <div id="start-screen" class="overlay">
         <div class="menu-box">
-            <h1 style="margin-top:0; color:#00d4ff;">TETRIS INVESTMENT</h1>
-            <div id="start-wallet" class="money" style="font-size:24px; margin-bottom:10px;">$0</div>
-            
-            <p style="font-size: 12px; color: #aaa; margin-bottom: 5px;">SELECT DIFFICULTY (RISK/REWARD)</p>
+            <h1 style="margin:0; color:#00d4ff; letter-spacing:2px;">TETRIS INVESTMENT</h1>
+            <div id="start-wallet" class="money" style="font-size:28px; margin:20px 0;">$0</div>
+            <p style="font-size: 11px; color: #888;">SELECT RISK LEVEL</p>
             <div class="speed-selector">
-                <button class="speed-btn" id="s-slow" onclick="setSpeed(0)">SLOW<br>x1.0</button>
-                <button class="speed-btn active" id="s-normal" onclick="setSpeed(1)">NORMAL<br>x1.2</button>
-                <button class="speed-btn" id="s-fast" onclick="setSpeed(2)">FAST<br>x1.5</button>
+                <button class="speed-btn" id="s-slow" onclick="setSpeed(0)">SLOW (x1.0)</button>
+                <button class="speed-btn active" id="s-normal" onclick="setSpeed(1)">NORMAL (x1.5)</button>
+                <button class="speed-btn" id="s-fast" onclick="setSpeed(2)">FAST (x2.5)</button>
             </div>
-
             <button class="btn" style="width:100%; font-size:18px;" onclick="startGame()">START GAME</button>
-            <button class="btn" style="width:100%; background:#444; color:white; margin-top:10px;" onclick="toggleShop(true)">OPEN SHOP</button>
+            <button class="btn" style="width:100%; background:#444; color:white; margin-top:10px;" onclick="toggleShop(true)">OPEN MARKET</button>
         </div>
     </div>
 
     <div id="shop-screen" class="overlay" style="display:none;">
         <div class="menu-box">
-            <h2 style="margin-top:0;">TOOL SHOP</h2>
-            <div id="shop-wallet" class="money" style="margin-bottom:15px;">$0</div>
-            
-            <div class="shop-item">
-                <span class="price">$1000</span>
-                <h4>Slow Down</h4><p style="font-size:10px; margin:2px 0;">初期落下速度をさらに遅くする</p>
-                <button id="buy-slow" class="btn" onclick="buyTool('slow', 1000)">BUY</button>
-            </div>
-            <div class="shop-item" style="border-left-color:#ffeb3b;">
-                <span class="price">$2000</span>
-                <h4>Profit Up</h4><p style="font-size:10px; margin:2px 0;">獲得スコア1.5倍</p>
-                <button id="buy-multi" class="btn" onclick="buyTool('multi', 2000)">BUY</button>
-            </div>
-            <div class="shop-item" style="border-left-color:#f44336;">
-                <span class="price">$5000</span>
-                <h4>Infinite Hold</h4><p style="font-size:10px; margin:2px 0;">ホールド回数無制限</p>
-                <button id="buy-hold" class="btn" onclick="buyTool('hold', 5000)">BUY</button>
-            </div>
-            <div id="shop-next-item" class="shop-item" style="border-left-color:#9c27b0;">
-                <span class="price">$3000</span>
-                <h4>Next Horizon</h4><p style="font-size:10px; margin:2px 0;">NEXTの表示数を6個に増やす</p>
-                <button id="buy-next" class="btn" onclick="buyTool('next6', 3000)">BUY</button>
+            <div id="shop-wallet" class="money" style="font-size:20px; margin-bottom:15px;">$0</div>
+            <div class="tab-container">
+                <button id="tab-tools" class="tab-btn active" onclick="switchTab('tools')">TOOLS</button>
+                <button id="tab-items" class="tab-btn" onclick="switchTab('items')">UPGRADES</button>
             </div>
 
-            <button class="btn" style="background:#555; color:white;" onclick="toggleShop(false)">CLOSE</button>
+            <div id="shop-tools-list">
+                <div class="shop-item">
+                    <span class="price">$5,000</span>
+                    <h4>Slow Down</h4><p>落下速度を低下。安定志向の投資家に。</p>
+                    <button class="btn" onclick="handlePurchase('slow', 5000, 'tool')">BUY / EQUIP</button>
+                </div>
+                <div class="shop-item">
+                    <span class="price">$15,000</span>
+                    <h4>Profit Multiplier</h4><p>ライン消去時の獲得資金が2.0倍に。</p>
+                    <button class="btn" onclick="handlePurchase('multi', 15000, 'tool')">BUY / EQUIP</button>
+                </div>
+                <div class="shop-item">
+                    <span class="price">$30,000</span>
+                    <h4>Next Horizon</h4><p>NEXT表示を6個に拡張。</p>
+                    <button class="btn" onclick="handlePurchase('next6', 30000, 'tool')">BUY / EQUIP</button>
+                </div>
+                <div class="shop-item">
+                    <span class="price">$80,000</span>
+                    <h4>Quantum Hold</h4><p>ホールド制限を完全に解除。</p>
+                    <button class="btn" onclick="handlePurchase('hold', 80000, 'tool')">BUY / EQUIP</button>
+                </div>
+            </div>
+
+            <div id="shop-items-list" style="display:none;">
+                <div class="shop-item" style="border: 2px solid #ffeb3b;">
+                    <span class="price">$500,000</span>
+                    <h4>Dual Core System</h4><p>ツールを同時に2つ装備可能にする最高級チップ。</p>
+                    <button id="buy-dual" class="btn" onclick="handlePurchase('dualSlot', 500000, 'item')">BUY UPGRADE</button>
+                </div>
+            </div>
+
+            <button class="btn" style="background:#555; color:white; width:100%; margin-top:10px;" onclick="toggleShop(false)">BACK</button>
         </div>
     </div>
 
     <div id="game-over-screen" class="overlay" style="display:none;">
         <div class="menu-box" style="border-color:#f44336;">
-            <h2 style="color:#f44336; margin-top:0;">GAME OVER</h2>
-            <p>EARNED MONEY: <span id="earned-money" class="money">$0</span></p>
-            <button class="btn" onclick="backToStart()">BACK TO MENU</button>
+            <h2 style="color:#f44336; margin:0;">SETTLEMENT</h2>
+            <p style="font-size:12px; color:#888;">MARKET RESULT</p>
+            <div id="earned-money" class="money" style="font-size:36px; margin:20px 0;">$0</div>
+            <button class="btn" onclick="backToStart()">RETURN TO MENU</button>
         </div>
     </div>
 
     <div class="game-container">
         <div class="side-panel">
             <div class="box"><div class="label">WALLET</div><div id="wallet" class="value money">$0</div></div>
-            <div class="box"><div class="label">SPEED LV</div><div id="speed-lv" class="value">1</div></div>
+            <div class="box">
+                <div class="label">EQUIPPED (Max: <span id="max-slots">1</span>)</div>
+                <div id="equipped-display" style="font-size:10px; color:#00d4ff; min-height:30px;">None</div>
+            </div>
             <div class="box"><div class="label">HOLD</div><canvas id="hold" class="small" width="80" height="80"></canvas></div>
         </div>
         
@@ -125,11 +146,14 @@
 
         const colors = [null, '#00FFFF', '#FFFF00', '#800080', '#00FF00', '#FF0000', '#0000FF', '#FF7F00'];
         
+        // 経済・装備システム
         let wallet = 0;
-        let tools = { slow: false, multi: false, hold: false, next6: false };
-        let selectedSpeed = 1; // 0:Slow, 1:Normal, 2:Fast
-        let speedMultiplier = [1.0, 1.2, 1.5];
-        let baseIntervals = [1200, 800, 400];
+        let ownedTools = []; // 買ったツール
+        let equippedTools = []; // 今つけてるツール
+        let hasDualSlot = false; // 2枠持ってるか
+        let selectedSpeed = 1; 
+        const speedMultipliers = [1.0, 1.5, 2.5];
+        const baseIntervals = [1200, 800, 400];
 
         let gameState = 'START';
         let score = 0;
@@ -142,12 +166,45 @@
             document.querySelectorAll('.speed-btn').forEach((b, i) => b.className = i === val ? 'speed-btn active' : 'speed-btn');
         }
 
-        function buyTool(id, price) {
-            if (wallet >= price && !tools[id]) {
-                wallet -= price;
-                tools[id] = true;
-                updateUI();
+        function switchTab(tab) {
+            document.getElementById('shop-tools-list').style.display = tab === 'tools' ? 'block' : 'none';
+            document.getElementById('shop-items-list').style.display = tab === 'items' ? 'block' : 'none';
+            document.getElementById('tab-tools').className = tab === 'tools' ? 'tab-btn active' : 'tab-btn';
+            document.getElementById('tab-items').className = tab === 'items' ? 'tab-btn active' : 'tab-btn';
+        }
+
+        function handlePurchase(id, price, type) {
+            if (type === 'item') {
+                if (wallet >= price && !hasDualSlot) {
+                    wallet -= price; hasDualSlot = true;
+                    document.getElementById('buy-dual').disabled = true;
+                    updateUI();
+                    alert("アップグレード完了！ツールを2つまで装備できるようになりました。");
+                }
+                return;
             }
+
+            // ツール購入・装備
+            if (!ownedTools.includes(id)) {
+                if (wallet >= price) {
+                    wallet -= price;
+                    ownedTools.push(id);
+                } else {
+                    alert("資金が足りません！"); return;
+                }
+            }
+
+            // 装備ロジック
+            if (equippedTools.includes(id)) {
+                equippedTools = equippedTools.filter(t => t !== id);
+            } else {
+                const max = hasDualSlot ? 2 : 1;
+                if (equippedTools.length >= max) {
+                    equippedTools.shift(); // 古い方を外す
+                }
+                equippedTools.push(id);
+            }
+            updateUI();
         }
 
         function toggleShop(show) {
@@ -156,17 +213,21 @@
         }
 
         function updateUI() {
-            document.getElementById('wallet').innerText = "$" + wallet;
-            document.getElementById('start-wallet').innerText = "$" + wallet;
-            document.getElementById('shop-wallet').innerText = "YOUR WALLET: $" + wallet;
-            document.getElementById('buy-slow').disabled = tools.slow || wallet < 1000;
-            document.getElementById('buy-multi').disabled = tools.multi || wallet < 2000;
-            document.getElementById('buy-hold').disabled = tools.hold || wallet < 5000;
-            document.getElementById('buy-next').disabled = tools.next6 || wallet < 3000;
+            document.getElementById('wallet').innerText = "$" + wallet.toLocaleString();
+            document.getElementById('start-wallet').innerText = "$" + wallet.toLocaleString();
+            document.getElementById('shop-wallet').innerText = "CAPITAL: $" + wallet.toLocaleString();
+            document.getElementById('max-slots').innerText = hasDualSlot ? "2" : "1";
             
-            // Next 6 ツールが適用されているか
-            document.getElementById('next-5').style.display = tools.next6 ? 'block' : 'none';
-            document.getElementById('next-6').style.display = tools.next6 ? 'block' : 'none';
+            // 装備表示
+            document.getElementById('equipped-display').innerText = equippedTools.length > 0 ? equippedTools.join(" / ") : "None";
+
+            // Next 6の表示切り替え
+            const hasNext6 = equippedTools.includes('next6');
+            document.getElementById('next-5').style.display = hasNext6 ? 'block' : 'none';
+            document.getElementById('next-6').style.display = hasNext6 ? 'block' : 'none';
+            
+            // アイテムショップのボタン状態
+            document.getElementById('buy-dual').disabled = hasDualSlot || wallet < 500000;
         }
 
         function startGame() {
@@ -175,15 +236,21 @@
             document.getElementById('score-val').innerText = "0";
             gameState = 'PLAYING';
             document.getElementById('start-screen').style.display = 'none';
+            updateUI();
             playerReset();
         }
 
         function handleGameOver() {
             gameState = 'GAMEOVER';
-            let earned = Math.floor(score * speedMultiplier[selectedSpeed]); // 難易度ボーナス
-            if(tools.multi) earned = Math.floor(earned * 1.5);
+            
+            // スコア倍率計算
+            let finalMultiplier = speedMultipliers[selectedSpeed];
+            if (equippedTools.includes('multi')) finalMultiplier *= 2.0;
+
+            let earned = Math.floor(score * finalMultiplier);
             wallet += earned;
-            document.getElementById('earned-money').innerText = "$" + earned;
+            
+            document.getElementById('earned-money').innerText = "$" + earned.toLocaleString();
             document.getElementById('game-over-screen').style.display = 'flex';
             updateUI();
         }
@@ -195,6 +262,7 @@
             updateUI();
         }
 
+        // --- 共通テトリスロジック ---
         function createPiece(type) {
             if (type === 'I') return [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]];
             if (type === 'O') return [[2,2],[2,2]];
@@ -206,7 +274,7 @@
         }
 
         function fillQueue() {
-            const target = tools.next6 ? 7 : 5;
+            const target = equippedTools.includes('next6') ? 7 : 5;
             while (nextQueue.length < target) {
                 if (bag.length === 0) {
                     bag = ['I','J','L','O','S','T','Z'];
@@ -222,7 +290,7 @@
         function drawMatrix(m, o, ctx, isGhost = false) {
             m.forEach((row, y) => row.forEach((v, x) => {
                 if (v !== 0) {
-                    ctx.fillStyle = isGhost ? 'rgba(255, 255, 255, 0.15)' : colors[v];
+                    ctx.fillStyle = isGhost ? 'rgba(255, 255, 255, 0.12)' : colors[v];
                     ctx.fillRect(x + o.x, y + o.y, 1, 1);
                 }
             }));
@@ -234,8 +302,9 @@
             for(let x=0; x<10; x++) for(let y=0; y<20; y++) context.strokeRect(x,y,1,1);
             
             if (gameState === 'PLAYING' || gameState === 'GAMEOVER') {
-                const gp = getGhostPosition();
-                drawMatrix(player.matrix, gp, context, true);
+                let gy = player.pos.y;
+                while(!collide(arena, {...player, pos: {x: player.pos.x, y: gy + 1}})) gy++;
+                drawMatrix(player.matrix, {x:player.pos.x, y:gy}, context, true);
                 drawMatrix(arena, {x:0, y:0}, context);
                 drawMatrix(player.matrix, player.pos, context);
             }
@@ -246,12 +315,6 @@
                 ctx.fillStyle = '#050505'; ctx.fillRect(0,0,6,6);
                 if(nextQueue[i]) drawMatrix(createPiece(nextQueue[i]), {x:0,y:0}, ctx);
             });
-        }
-
-        function getGhostPosition() {
-            let gy = player.pos.y;
-            while(!collide(arena, {...player, pos: {x: player.pos.x, y: gy + 1}})) gy++;
-            return {x: player.pos.x, y: gy};
         }
 
         function collide(arena, p) {
@@ -310,7 +373,7 @@
         }
 
         function playerHold() {
-            if(!canHold && !tools.hold) return;
+            if(!canHold && !equippedTools.includes('hold')) return;
             if(!holdPiece) { holdPiece = createPiece(player.type); playerReset(); }
             else { const t = holdPiece; holdPiece = createPiece(player.type); player.matrix = t; player.pos.y = 0; player.pos.x = 3; }
             canHold = false;
@@ -320,15 +383,11 @@
         function update(time = 0) {
             const dt = time - lastTime; lastTime = time;
             if(gameState === 'PLAYING') {
-                // 基本の速さ + スコアによるスピードアップ（1000点ごとにレベル1上昇、速くなる）
-                let level = Math.floor(score / 1000);
-                document.getElementById('speed-lv').innerText = level + 1;
-                
+                let level = Math.floor(score / 1500);
                 let baseInterval = baseIntervals[selectedSpeed];
-                if(tools.slow) baseInterval += 300; // ツール効果
+                if(equippedTools.includes('slow')) baseInterval += 400;
 
-                let interval = Math.max(100, baseInterval - (level * 50)); // 最小100msまで加速
-                
+                let interval = Math.max(80, baseInterval - (level * 60));
                 dropCounter += keys[40] ? dt * 15 : dt;
                 if(dropCounter > interval) { player.pos.y++; if(collide(arena, player)){ player.pos.y--; merge(); playerReset(); arenaSweep(); canHold=true; } dropCounter=0; }
             }
