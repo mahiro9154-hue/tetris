@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Tetris Ultimate - SRS Edition</title>
+    <style>
+        body { background: #0f0f13; color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .game-container { display: flex; gap: 20px; align-items: flex-start; position: relative; }
+        canvas { border: 4px solid #444; background-color: #000; box-shadow: 0 0 30px rgba(0,0,0,0.7); }
+        .side-panel { display: flex; flex-direction: column; gap: 8px; width: 140px; }
+        .box { border: 2px solid #333; padding: 8px; background: rgba(34, 34, 34, 0.9); text-align: center; border-radius: 4px; }
+        .label { font-size: 10px; color: #888; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 1px; }
+        .value { font-size: 16px; font-weight: bold; color: #00d4ff; }
+        .money { color: #ffeb3b; font-size: 20px; }
+        .score-table { font-size: 10px; text-align: left; line-height: 1.7; color: #aaa; }
+        .score-table b { color: #fff; float: right; }
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 300; }
+        .menu-box { background: #222; padding: 40px; border-radius: 10px; border: 2px solid #444; text-align: center; min-width: 260px; }
+        .btn { background: #00d4ff; color: #000; border: none; padding: 12px 30px; cursor: pointer; border-radius: 5px; font-size: 18px; font-weight: bold; transition: 0.2s; }
+        .btn:hover { background: #fff; transform: scale(1.05); }
+        canvas.small { background: #050505; margin-top: 5px; border-radius: 2px; }
+    </style>
+</head>
+<body>
+
+<div id="start-screen" class="overlay">
+    <div class="menu-box">
+        <h1 style="margin-top:0; letter-spacing:4px;">TETRIS</h1>
+        <p style="color:#888; margin-bottom:4px;">SRS Edition</p>
+        <p style="color:#555; font-size:12px; margin-bottom:24px;">
+            ↑ / X: 時計回り &nbsp; Z: 反時計回り<br>
+            Space: ハードドロップ &nbsp; C: ホールド<br>
+            ↓: ソフトドロップ
+        </p>
+        <button class="btn" onclick="startGame()">START GAME</button>
+    </div>
+</div>
+
+<div id="game-over-screen" class="overlay" style="display:none;">
+    <div class="menu-box" style="border-color:#f44336;">
+        <h2 style="color:#f44336; margin-top:0;">GAME OVER</h2>
+        <p style="margin-bottom:5px;">SCORE</p>
+        <div id="final-score" class="value" style="font-size:30px; margin-bottom:20px;">0</div>
+        <p style="color:#ffeb3b; margin-bottom:5px;">WALLET +</p>
+        <div id="earned-money" class="money" style="font-size:30px; margin-bottom:30px;">$0</div>
+        <button class="btn" onclick="backToStart()">BACK TO MENU</button>
+    </div>
+</div>
+
+<div class="game-container">
+    <div class="side-panel">
+        <div class="box">
+            <div class="label">WALLET</div>
+            <div id="wallet" class="value money">$0</div>
+        </div>
+        <div class="box">
+            <div class="label">SCORE TABLE</div>
+            <div class="score-table">
+                Single: <b>100</b><br>
+                Double: <b>300</b><br>
+                Triple: <b>500</b><br>
+                Tetris: <b>800</b><br>
+                T-Spin: <b>400</b><br>
+                TST: <b>1600</b>
+            </div>
+        </div>
+        <div class="box">
+            <div class="label">HOLD</div>
+            <canvas id="hold" class="small" width="80" height="80"></canvas>
+        </div>
+    </div>
+
+    <canvas id="tetris" width="200" height="400"></canvas>
+
+    <div class="side-panel">
+        <div class="box">
+            <div class="label">NEXT</div>
+            <canvas id="next-1" class="small" width="60" height="60"></canvas>
+            <canvas id="next-2" class="small" width="50" height="50" style="opacity:0.7"></canvas>
+            <canvas id="next-3" class="small" width="50" height="50" style="opacity:0.5"></canvas>
+            <canvas id="next-4" class="small" width="50" height="50" style="opacity:0.3"></canvas>
+        </div>
+        <div class="box">
+            <div class="label">SCORE</div>
+            <div id="score-val" class="value">0</div>
+        </div>
+        <div class="box">
+            <div class="label">LAST ACTION</div>
+            <div id="kick-info" style="font-size:10px; color:#ff9800; min-height:14px; word-break:break-all;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ─── Canvas setup ───────────────────────────────────
+const canvas   = document.getElementById('tetris');
+const ctx      = canvas.getContext('2d');
+const hCtx     = document.getElementById('hold').getContext('2d');
+const nextCtxs = ['next-1','next-2','next-3','next-4'].map(id => document.getElementById(id).getContext('2d'));
+ctx.scale(20, 20);
+hCtx.scale(20, 20);
+nextCtxs.forEach(c => c.scale(15, 15));
+
+const COLS = 10, ROWS = 20;
+const COLORS = [null,'#00FFFF','#FFFF00','#A000F0','#00F000','#F00000','#0000F0','#F0A000'];
+
+// ─── SRS Kick Tables (Tetris Guideline 完全準拠) ─────
+// キー: "fromRot>toRot", 値: [[dx,dy], ...] (dy: 下向き正)
+const KICKS_JLSTZ = {
+    '0>1': [[ 0, 0],[-1, 0],[-1,-1],[ 0, 2],[-1, 2]],
+    '1>0': [[ 0, 0],[ 1, 0],[ 1, 1],[ 0,-2],[ 1,-2]],
+    '1>2': [[ 0, 0],[ 1, 0],[ 1, 1],[ 0,-2],[ 1,-2]],
+    '2>1': [[ 0, 0],[-1, 0],[-1,-1],[ 0, 2],[-1, 2]],
+    '2>3': [[ 0, 0],[ 1, 0],[ 1,-1],[ 0, 2],[ 1, 2]],
+    '3>2': [[ 0, 0],[-1, 0],[-1, 1],[ 0,-2],[-1,-2]],
+    '3>0': [[ 0, 0],[-1, 0],[-1, 1],[ 0,-2],[-1,-2]],
+    '0>3': [[ 0, 0],[ 1, 0],[ 1,-1],[ 0, 2],[ 1, 2]],
+};
+const KICKS_I = {
+    '0>1': [[ 0, 0],[-2, 0],[ 1, 0],[-2, 1],[ 1,-2]],
+    '1>0': [[ 0, 0],[ 2, 0],[-1, 0],[ 2,-1],[-1, 2]],
+    '1>2': [[ 0, 0],[-1, 0],[ 2, 0],[-1,-2],[ 2, 1]],
+    '2>1': [[ 0, 0],[ 1, 0],[-2, 0],[ 1, 2],[-2,-1]],
+    '2>3': [[ 0, 0],[ 2, 0],[-1, 0],[ 2,-1],[-1, 2]],
+    '3>2': [[ 0, 0],[-2, 0],[ 1, 0],[-2, 1],[ 1,-2]],
+    '3>0': [[ 0, 0],[ 1, 0],[-2, 0],[ 1, 2],[-2,-1]],
+    '0>3': [[ 0, 0],[-1, 0],[ 2, 0],[-1,-2],[ 2, 1]],
+};
+
+// ─── Piece definitions ──────────────────────────────
+function makePiece(type) {
+    const p = { type, rot: 0 };
+    switch(type) {
+        case 'I': p.cells = [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]]; break;
+        case 'O': p.cells = [[2,2],[2,2]]; break;
+        case 'T': p.cells = [[0,3,0],[3,3,3],[0,0,0]]; break;
+        case 'S': p.cells = [[0,4,4],[4,4,0],[0,0,0]]; break;
+        case 'Z': p.cells = [[5,5,0],[0,5,5],[0,0,0]]; break;
+        case 'J': p.cells = [[6,0,0],[6,6,6],[0,0,0]]; break;
+        case 'L': p.cells = [[0,0,7],[7,7,7],[0,0,0]]; break;
+    }
+    return p;
+}
+
+function rotateCW(cells) {
+    const N = cells.length;
+    return Array.from({length:N}, (_,y) => Array.from({length:N}, (_,x) => cells[N-1-x][y]));
+}
+function rotateCCW(cells) {
+    const N = cells.length;
+    return Array.from({length:N}, (_,y) => Array.from({length:N}, (_,x) => cells[x][N-1-y]));
+}
+
+// ─── Game state ─────────────────────────────────────
+let gameState = 'START';
+let wallet = 0, score = 0;
+let arena, player, holdPiece, canHold, bag, nextQueue;
+let lastMoveRot = false;
+let lastKickIdx = 0;
+let dropCounter = 0, lastTime = 0;
+const keys = {};
+
+// ─── Bag ────────────────────────────────────────────
+function fillQueue() {
+    while (nextQueue.length < 5) {
+        if (bag.length === 0) {
+            bag = ['I','J','L','O','S','T','Z'];
+            for (let i = bag.length-1; i > 0; i--) {
+                const j = Math.floor(Math.random()*(i+1));
+                [bag[i],bag[j]] = [bag[j],bag[i]];
+            }
+        }
+        nextQueue.push(bag.pop());
+    }
+}
+
+// ─── Collision ──────────────────────────────────────
+function collide(cells, px, py) {
+    for (let y = 0; y < cells.length; y++) {
+        for (let x = 0; x < cells[y].length; x++) {
+            if (!cells[y][x]) continue;
+            const nx = px+x, ny = py+y;
+            if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+            if (ny >= 0 && arena[ny][nx]) return true;
+        }
+    }
+    return false;
+}
+
+// ─── SRS Rotate (核心) ──────────────────────────────
+function srsRotate(dir) {
+    if (!player || player.piece.type === 'O') return false;
+
+    const from    = player.piece.rot;
+    const to      = (from + dir + 4) % 4;
+    const key     = `${from}>${to}`;
+    const newCells = dir > 0 ? rotateCW(player.piece.cells) : rotateCCW(player.piece.cells);
+    const kicks   = player.piece.type === 'I' ? KICKS_I[key] : KICKS_JLSTZ[key];
+
+    for (let i = 0; i < kicks.length; i++) {
+        const [dx, dy] = kicks[i];
+        if (!collide(newCells, player.x + dx, player.y + dy)) {
+            player.piece = { ...player.piece, cells: newCells, rot: to };
+            player.x += dx;
+            player.y += dy;
+            lastMoveRot = true;
+            lastKickIdx = i;
+            // kick info 表示
+            const label = i === 0 ? 'rot OK' : `kick #${i} [${dx>=0?'+':''}${dx},${dy>=0?'+':''}${dy}]`;
+            document.getElementById('kick-info').innerText = label;
+            return true;
+        }
+    }
+    return false;
+}
+
+// ─── T-Spin detection (3-corner rule) ──────────────
+function detectTSpin() {
+    if (!player || player.piece.type !== 'T' || !lastMoveRot) return 'none';
+    const cx = player.x + 1, cy = player.y + 1;
+    const corners = [[cx-1,cy-1],[cx+1,cy-1],[cx-1,cy+1],[cx+1,cy+1]];
+    function blocked(x,y){ return x<0||x>=COLS||y>=ROWS||(y>=0&&arena[y][x]!==0); }
+    const filled = corners.map(([x,y]) => blocked(x,y));
+    if (filled.filter(Boolean).length < 3) return 'none';
+    const frontIdx = [[0,1],[1,3],[2,3],[0,2]][player.piece.rot];
+    const frontCount = frontIdx.filter(i => filled[i]).length;
+    if (frontCount === 2 || lastKickIdx >= 1) return 'tspin';
+    return 'mini';
+}
+
+// ─── Arena sweep & scoring ──────────────────────────
+function arenaSweep() {
+    const tspin = detectTSpin();
+    let rows = 0;
+    for (let y = ROWS-1; y >= 0; y--) {
+        if (arena[y].every(v => v !== 0)) {
+            arena.splice(y,1);
+            arena.unshift(new Array(COLS).fill(0));
+            rows++; y++;
+        }
+    }
+    let pts = 0, msg = '';
+    if (tspin === 'tspin') {
+        pts = [400,800,1200,1600][rows] ?? 400;
+        msg = ['T-SPIN!','T-SPIN SINGLE!','T-SPIN DOUBLE!','T-SPIN TRIPLE!'][rows] ?? 'T-SPIN!';
+    } else if (tspin === 'mini') {
+        pts = rows > 0 ? 200*rows : 100;
+        msg = 'Mini T-Spin' + (rows > 0 ? ` x${rows}` : '');
+    } else if (rows > 0) {
+        pts = [100,300,500,800][rows-1] ?? 800;
+        if (rows === 4) msg = 'TETRIS!';
+    }
+    if (pts) { score += pts; document.getElementById('score-val').innerText = score; }
+    if (msg) showFloating(msg);
+}
+
+// ─── Player ─────────────────────────────────────────
+function playerReset() {
+    fillQueue();
+    const type = nextQueue.shift();
+    player = { piece: makePiece(type), x: 3, y: 0 };
+    lastMoveRot = false; lastKickIdx = 0;
+    fillQueue();
+    if (collide(player.piece.cells, player.x, player.y)) handleGameOver();
+}
+
+function merge() {
+    player.piece.cells.forEach((row,y) => row.forEach((v,x) => {
+        if (v) arena[player.y+y][player.x+x] = v;
+    }));
+}
+
+function lock() {
+    merge(); arenaSweep(); playerReset(); canHold = true; dropCounter = 0;
+}
+
+function hardDrop() {
+    while (!collide(player.piece.cells, player.x, player.y+1)) { player.y++; }
+    lastMoveRot = false;
+    lock();
+}
+
+function playerHold() {
+    if (!canHold) return;
+    const cur = player.piece.type;
+    if (!holdPiece) { holdPiece = cur; playerReset(); }
+    else {
+        const prev = holdPiece; holdPiece = cur;
+        player = { piece: makePiece(prev), x: 3, y: 0 };
+        lastMoveRot = false;
+    }
+    canHold = false;
+}
+
+// ─── Ghost ──────────────────────────────────────────
+function ghostY() {
+    let gy = player.y;
+    while (!collide(player.piece.cells, player.x, gy+1)) gy++;
+    return gy;
+}
+
+// ─── Draw ───────────────────────────────────────────
+function drawCells(cells, ox, oy, dc, ghost) {
+    cells.forEach((row,y) => row.forEach((v,x) => {
+        if (!v) return;
+        dc.fillStyle = ghost ? 'rgba(255,255,255,0.13)' : COLORS[v];
+        dc.fillRect(ox+x, oy+y, 1, 1);
+        if (!ghost) {
+            dc.strokeStyle = 'rgba(255,255,255,0.18)';
+            dc.lineWidth = 0.05;
+            dc.strokeRect(ox+x, oy+y, 1, 1);
+        }
+    }));
+}
+
+function draw() {
+    ctx.fillStyle = '#000'; ctx.fillRect(0,0,COLS,ROWS);
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 0.05;
+    for (let x=0;x<COLS;x++) for(let y=0;y<ROWS;y++) ctx.strokeRect(x,y,1,1);
+
+    if (gameState !== 'START') {
+        drawCells(arena, 0, 0, ctx, false);
+        if (player) {
+            drawCells(player.piece.cells, player.x, ghostY(), ctx, true);
+            drawCells(player.piece.cells, player.x, player.y, ctx, false);
+        }
+    }
+    hCtx.fillStyle='#050505'; hCtx.fillRect(0,0,4,4);
+    if (holdPiece) drawCells(makePiece(holdPiece).cells, 0, 0, hCtx, false);
+    nextCtxs.forEach((nc,i) => {
+        nc.fillStyle='#050505'; nc.fillRect(0,0,6,6);
+        if (nextQueue[i]) drawCells(makePiece(nextQueue[i]).cells, 0, 0, nc, false);
+    });
+}
+
+// ─── Floating message ────────────────────────────────
+let floatEl = null, floatTimer = null;
+function showFloating(text) {
+    if (!floatEl) {
+        floatEl = document.createElement('div');
+        Object.assign(floatEl.style, {
+            position:'absolute', left:'50%', top:'35%',
+            transform:'translate(-50%,-50%)', pointerEvents:'none',
+            fontSize:'26px', fontWeight:'bold', color:'#fff',
+            textShadow:'0 0 12px #ff0, 2px 2px #000',
+            textAlign:'center', whiteSpace:'pre', zIndex:'10', opacity:'0',
+            transition:'opacity 0.15s'
+        });
+        document.querySelector('.game-container').appendChild(floatEl);
+    }
+    floatEl.innerText = text; floatEl.style.opacity='1';
+    clearTimeout(floatTimer);
+    floatTimer = setTimeout(() => { floatEl.style.opacity='0'; }, 1400);
+}
+
+// ─── Input ──────────────────────────────────────────
+window.addEventListener('keydown', e => {
+    if (gameState !== 'PLAYING') return;
+    if (!keys[e.keyCode]) {
+        if (e.keyCode===38||e.keyCode===88) srsRotate(1);
+        if (e.keyCode===90) srsRotate(-1);
+        if (e.keyCode===32) { e.preventDefault(); hardDrop(); }
+        if (e.keyCode===67) playerHold();
+    }
+    if (e.keyCode===37) {
+        if (!collide(player.piece.cells, player.x-1, player.y)) { player.x--; lastMoveRot=false; }
+    }
+    if (e.keyCode===39) {
+        if (!collide(player.piece.cells, player.x+1, player.y)) { player.x++; lastMoveRot=false; }
+    }
+    keys[e.keyCode] = true;
+});
+window.addEventListener('keyup', e => { keys[e.keyCode]=false; });
+
+// ─── Game loop ──────────────────────────────────────
+function update(time = 0) {
+    const dt = time - lastTime; lastTime = time;
+    if (gameState === 'PLAYING') {
+        dropCounter += keys[40] ? dt*20 : dt;
+        if (dropCounter > 1000) {
+            if (!collide(player.piece.cells, player.x, player.y+1)) {
+                player.y++; lastMoveRot=false;
+            } else { lock(); }
+            dropCounter = 0;
+        }
+    }
+    draw(); requestAnimationFrame(update);
+}
+
+// ─── Screen management ──────────────────────────────
+function startGame() {
+    arena     = Array.from({length:ROWS}, () => new Array(COLS).fill(0));
+    score     = 0; holdPiece = null; canHold = true; nextQueue = []; bag = [];
+    document.getElementById('score-val').innerText = '0';
+    document.getElementById('kick-info').innerText = '';
+    gameState = 'PLAYING';
+    document.getElementById('start-screen').style.display = 'none';
+    playerReset();
+}
+
+function handleGameOver() {
+    gameState = 'GAMEOVER'; wallet += score;
+    document.getElementById('wallet').innerText       = '$'+wallet;
+    document.getElementById('final-score').innerText  = score;
+    document.getElementById('earned-money').innerText = '$'+score;
+    document.getElementById('game-over-screen').style.display = 'flex';
+}
+
+function backToStart() {
+    gameState = 'START';
+    document.getElementById('game-over-screen').style.display = 'none';
+    document.getElementById('start-screen').style.display     = 'flex';
+}
+
+update();
+</script>
+</body>
+</html>
