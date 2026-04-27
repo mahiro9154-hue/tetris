@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Tetris Investment</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    background: #080810; color: #fff;
+    font-family: 'Segoe UI', sans-serif;
+    height: 100vh; overflow: hidden;
+}
+
+/* ── SCREENS ── */
+.screen { display: none; width: 100%; height: 100vh; }
+.screen.active { display: flex; }
+
+/* ══════════════════════════════════════════════
+   HOME
+══════════════════════════════════════════════ */
+#home-screen { flex-direction: column; align-items: center; justify-content: center; overflow-y: auto; position: relative; }
+#home-screen::before {
+    content: ''; position: fixed; inset: 0;
+    background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+}
+.page-wrapper { position: relative; z-index: 1; width: 100%; max-width: 1160px; padding: 36px 28px; display: flex; flex-direction: column; align-items: center; gap: 32px; }
+
+.header { text-align: center; }
+.logo { font-size: 52px; font-weight: 900; letter-spacing: 8px; color: #00d4ff; text-shadow: 0 0 40px rgba(0,212,255,0.5); cursor: pointer; user-select: none; line-height: 1; }
+.logo-sub { font-size: 13px; letter-spacing: 6px; color: #334; margin-top: 6px; text-transform: uppercase; }
+.wallet-display { margin-top: 16px; font-size: 34px; font-weight: bold; color: #ffd93d; text-shadow: 0 0 20px rgba(255,217,61,0.4); transition: color .3s, transform .1s; }
+.wallet-label { font-size: 11px; letter-spacing: 3px; color: #444; text-transform: uppercase; margin-top: 2px; }
+
+.main-layout { display: flex; gap: 24px; width: 100%; align-items: flex-start; }
+
+/* Shop panel */
+.shop-panel { flex: 1; background: #0d0d1a; border: 1px solid #1e1e35; border-radius: 12px; padding: 22px; min-width: 0; }
+.panel-title { font-size: 11px; letter-spacing: 3px; color: #444; text-transform: uppercase; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.panel-title::after { content: ''; flex: 1; height: 1px; background: #1e1e35; }
+
+.tab-row { display: flex; gap: 6px; margin-bottom: 14px; }
+.tab-btn { flex: 1; padding: 8px; background: #111120; border: 1px solid #222; color: #555; cursor: pointer; border-radius: 6px; font-size: 12px; font-weight: bold; letter-spacing: 1px; transition: .15s; }
+.tab-btn.active { background: #0d1a2a; border-color: #00d4ff; color: #00d4ff; }
+.tab-btn.skill-tab.active { background: #1a0d2a; border-color: #b060ff; color: #b060ff; }
+
+.shop-items { display: flex; flex-direction: column; gap: 10px; }
+.shop-item { background: #0a0a16; border: 1px solid #1e1e30; border-left: 3px solid #222; border-radius: 8px; padding: 14px 14px 12px; transition: border-color .2s, background .2s; position: relative; }
+.shop-item.owned   { border-left-color: #00d4ff; }
+.shop-item.equipped { border-left-color: #00ff99; background: #0a1a12; }
+.shop-item.special { border: 1px solid #3a3010; border-left: 3px solid #ffd93d; }
+.shop-item.skill-item { border-left-color: #331a4a; }
+.shop-item.skill-item.owned { border-left-color: #b060ff; background: #120a1e; }
+
+.item-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.item-name { font-size: 14px; font-weight: bold; color: #ddd; display: flex; align-items: center; gap: 8px; }
+.badge { font-size: 9px; padding: 2px 7px; border-radius: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: .5px; }
+.badge-equipped { background: #00ff99; color: #000; }
+.badge-owned    { background: #00d4ff; color: #000; }
+.badge-skill    { background: #b060ff; color: #fff; }
+.badge-active   { background: #ffd93d; color: #000; }
+.item-price { font-size: 13px; font-weight: bold; color: #ffd93d; white-space: nowrap; margin-left: 10px; }
+.item-price.mp-cost { color: #a080ff; }
+.item-desc { font-size: 11px; color: #555; line-height: 1.5; margin-bottom: 10px; }
+.item-btn { background: #151528; border: 1px solid #2a2a44; color: #888; padding: 6px 14px; cursor: pointer; border-radius: 5px; font-size: 11px; font-weight: bold; letter-spacing: 1px; transition: .15s; }
+.item-btn:hover:not(:disabled) { background: #00d4ff; border-color: #00d4ff; color: #000; }
+.item-btn.skill-buy:hover:not(:disabled) { background: #b060ff; border-color: #b060ff; color: #fff; }
+.item-btn:disabled { opacity: .35; cursor: not-allowed; }
+.item-btn.equipped-btn { background: #0a2018; border-color: #00ff99; color: #00ff99; }
+.item-btn.equipped-btn:hover { background: #f33; border-color: #f33; color: #fff; }
+
+/* Right panel */
+.right-panel { width: 272px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; }
+.action-card { background: #0d0d1a; border: 1px solid #1e1e35; border-radius: 12px; padding: 18px; }
+.speed-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 10px; }
+.speed-btn { padding: 10px 4px; background: #0a0a16; border: 1px solid #1e1e30; color: #444; cursor: pointer; border-radius: 7px; font-size: 11px; font-weight: bold; text-align: center; transition: .15s; line-height: 1.4; }
+.speed-btn .mult { font-size: 15px; color: #555; display: block; }
+.speed-btn:hover { border-color: #333; color: #aaa; }
+.speed-btn.active { background: #0d1a2a; border-color: #00d4ff; color: #fff; }
+.speed-btn.active .mult { color: #00d4ff; }
+.equipped-box { margin-top: 10px; min-height: 30px; font-size: 11px; color: #00ff99; line-height: 1.8; }
+.no-equip { color: #333; font-style: italic; }
+.start-btn { width: 100%; padding: 18px; background: linear-gradient(135deg,#00d4ff,#0088bb); border: none; color: #000; font-size: 20px; font-weight: 900; letter-spacing: 3px; cursor: pointer; border-radius: 10px; transition: .2s; box-shadow: 0 0 30px rgba(0,212,255,.25); }
+.start-btn:hover { background: linear-gradient(135deg,#33e0ff,#00aadd); transform: translateY(-2px); }
+.controls { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; margin-top: 10px; }
+.ctrl-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #444; }
+.key { background: #111120; border: 1px solid #222; border-radius: 4px; padding: 2px 6px; font-size: 10px; color: #666; white-space: nowrap; font-family: monospace; }
+
+/* ══════════════════════════════════════════════
+   GAME SCREEN
+══════════════════════════════════════════════ */
+#game-screen { align-items: center; justify-content: center; background: #0a0a10; position: relative; }
+.game-container { display: flex; gap: 18px; align-items: flex-start; position: relative; }
+canvas { border: 3px solid #333; background: #000; box-shadow: 0 0 24px rgba(0,0,0,.8); display: block; }
+.side-panel { display: flex; flex-direction: column; gap: 7px; width: 155px; }
+.box { border: 1px solid #2a2a3a; padding: 8px; background: #0e0e1a; text-align: center; border-radius: 6px; }
+.glabel { font-size: 9px; color: #555; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 1.5px; }
+.value { font-size: 15px; font-weight: bold; color: #00d4ff; }
+.gmoney { color: #ffeb3b; }
+canvas.small { background: #050508; margin-top: 4px; border-radius: 2px; display: block; margin-left: auto; margin-right: auto; }
+
+/* MP bar */
+.mp-bar-wrap { margin-top: 5px; background: #0a0a18; border-radius: 4px; height: 10px; overflow: hidden; border: 1px solid #222; }
+.mp-bar-fill { height: 100%; background: linear-gradient(90deg, #6030c0, #b060ff); transition: width .15s; border-radius: 4px; }
+.mp-text { font-size: 10px; color: #9060d0; margin-top: 3px; }
+
+/* Mino picker */
+#mino-picker {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    bottom: 12px; display: none;
+    background: rgba(10,8,20,0.97); border: 1px solid #b060ff;
+    border-radius: 10px; padding: 10px 14px;
+    z-index: 200; box-shadow: 0 0 30px rgba(176,96,255,0.3);
+}
+#mino-picker .picker-title { font-size: 10px; color: #b060ff; letter-spacing: 2px; text-align: center; margin-bottom: 8px; }
+#mino-picker .picker-row { display: flex; gap: 6px; }
+.mino-choice {
+    width: 44px; height: 44px; background: #0d0d1e; border: 1px solid #333;
+    border-radius: 6px; cursor: pointer; transition: .15s; display: flex; align-items: center; justify-content: center;
+}
+.mino-choice:hover { border-color: #b060ff; background: #1a1030; transform: scale(1.08); }
+.mino-choice canvas { border: none; box-shadow: none; }
+
+/* Skill button in game */
+.skill-btn {
+    width: 100%; padding: 9px;
+    background: linear-gradient(135deg,#2a1040,#1a0830);
+    border: 1px solid #6030a0; color: #b060ff;
+    border-radius: 7px; font-size: 12px; font-weight: bold;
+    letter-spacing: 1px; cursor: pointer; transition: .15s;
+}
+.skill-btn:hover:not(:disabled) { border-color: #b060ff; background: linear-gradient(135deg,#3a1860,#2a1040); }
+.skill-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+/* Overlays */
+.game-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,.95); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 300; }
+.menu-box-g { background: #151520; padding: 30px; border-radius: 10px; border: 2px solid #333; text-align: center; width: 300px; }
+.gbtn { background: #00d4ff; color: #000; border: none; padding: 10px 20px; cursor: pointer; border-radius: 5px; font-size: 14px; font-weight: bold; transition: .2s; margin: 5px; }
+.gbtn:hover { background: #fff; transform: scale(1.04); }
+.gbtn-back { background: #222; color: #888; border: 1px solid #333; }
+.gbtn-back:hover { background: #333; color: #fff; }
+.home-btn { background: #111120; border: 1px solid #222; color: #444; padding: 7px; cursor: pointer; border-radius: 5px; font-size: 11px; letter-spacing: 1px; transition: .15s; }
+.home-btn:hover { color: #aaa; border-color: #444; }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: none; align-items: center; justify-content: center; z-index: 999; }
+.modal-overlay.show { display: flex; }
+.modal { background: #111120; border: 1px solid #333; border-radius: 10px; padding: 30px; text-align: center; min-width: 250px; }
+.modal input { background: #0a0a16; border: 1px solid #333; color: #0ff; padding: 10px 14px; width: 100%; border-radius: 6px; font-size: 14px; margin: 12px 0; }
+.mbtn { background: #1e1e35; border: 1px solid #333; color: #aaa; padding: 8px 16px; cursor: pointer; border-radius: 6px; font-size: 12px; margin: 3px; transition: .15s; }
+.mbtn:hover { background: #2a2a45; color: #fff; }
+.mbtn.danger { border-color: #f44; }
+.mbtn.danger:hover { background: #f44; color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- DEV MODALS -->
+<div id="pass-overlay" class="modal-overlay">
+    <div class="modal">
+        <h2 style="color:#f44;font-size:15px;letter-spacing:2px;">ADMIN ACCESS</h2>
+        <input type="password" id="dev-pass" placeholder="PASSWORD">
+        <div>
+            <button class="mbtn danger" onclick="checkPassword()">UNLOCK</button>
+            <button class="mbtn" onclick="closeModal('pass-overlay')">CANCEL</button>
+        </div>
+    </div>
+</div>
+<div id="dev-overlay" class="modal-overlay">
+    <div class="modal" style="border-style:dashed;border-color:#0f0;">
+        <h2 style="color:#0f0;font-size:15px;letter-spacing:2px;">DEV TOOLS</h2>
+        <input type="number" id="dev-money-input" placeholder="SET WALLET">
+        <div>
+            <button class="mbtn" onclick="saveDevMoney()">SET MONEY</button>
+            <button class="mbtn" onclick="closeModal('dev-overlay')">EXIT</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     HOME SCREEN
+══════════════════════════════════════════════ -->
+<div id="home-screen" class="screen active">
+  <div class="page-wrapper">
+    <div class="header">
+        <div class="logo" id="logo-click">TETRIS</div>
+        <div class="logo-sub">Investment Edition</div>
+        <div class="wallet-display" id="h-wallet">$0</div>
+        <div class="wallet-label">CAPITAL</div>
+    </div>
+
+    <div class="main-layout">
+      <!-- SHOP PANEL -->
+      <div class="shop-panel">
+        <div class="panel-title">Market</div>
+        <div class="tab-row">
+            <button class="tab-btn active"  id="tab-tools"   onclick="switchTab('tools')">TOOLS</button>
+            <button class="tab-btn"          id="tab-upgrades" onclick="switchTab('upgrades')">UPGRADES</button>
+            <button class="tab-btn skill-tab" id="tab-skills"  onclick="switchTab('skills')">SKILLS</button>
+        </div>
+
+        <!-- TOOLS -->
+        <div id="tab-tools-content" class="shop-items">
+          <div class="shop-item" id="si-slow">
+            <div class="item-top"><div class="item-name">Slow Down <span id="badge-slow"></span></div><div class="item-price">$5,000</div></div>
+            <div class="item-desc">重力制御装置。ブロックの落下速度を低下させる。精密な操作が必要な投資家向け。</div>
+            <button class="item-btn" id="btn-slow" onclick="handlePurchase('slow',5000)">BUY</button>
+          </div>
+          <div class="shop-item" id="si-multi">
+            <div class="item-top"><div class="item-name">Profit Multiplier <span id="badge-multi"></span></div><div class="item-price">$15,000</div></div>
+            <div class="item-desc">収益倍増チップ。ゲームオーバー時の獲得資金を2.0倍にブーストする。</div>
+            <button class="item-btn" id="btn-multi" onclick="handlePurchase('multi',15000)">BUY</button>
+          </div>
+          <div class="shop-item" id="si-next6">
+            <div class="item-top"><div class="item-name">Next Horizon <span id="badge-next6"></span></div><div class="item-price">$30,000</div></div>
+            <div class="item-desc">未来予測システム。NEXT表示を6個まで拡張し、長期的なビルドプランを可能にする。</div>
+            <button class="item-btn" id="btn-next6" onclick="handlePurchase('next6',30000)">BUY</button>
+          </div>
+          <div class="shop-item" id="si-hold">
+            <div class="item-top"><div class="item-name">Quantum Hold <span id="badge-hold"></span></div><div class="item-price">$80,000</div></div>
+            <div class="item-desc">量子ホールド。ホールド制限を解除し、いつでもホールドと入れ替え可能にする。</div>
+            <button class="item-btn" id="btn-hold" onclick="handlePurchase('hold',80000)">BUY</button>
+          </div>
+        </div>
+
+        <!-- UPGRADES -->
+        <div id="tab-upgrades-content" class="shop-items" style="display:none;">
+          <div class="shop-item special" id="si-dual">
+            <div class="item-top"><div class="item-name">Dual Core System <span id="badge-dual"></span></div><div class="item-price">$500,000</div></div>
+            <div class="item-desc">マザーボード拡張。装備可能なツールを2つに拡張する伝説のチップ。</div>
+            <button class="item-btn" id="btn-dual" onclick="handleDual()">UPGRADE</button>
+          </div>
+          <div class="shop-item special" id="si-mpregen">
+            <div class="item-top"><div class="item-name">MP Accelerator <span id="badge-mpregen"></span></div><div class="item-price">$200,000</div></div>
+            <div class="item-desc">MPの自動回復速度を2倍に強化するモジュール。スキル連発が可能になる。</div>
+            <button class="item-btn" id="btn-mpregen" onclick="handleUpgrade('mpregen',200000)">UPGRADE</button>
+          </div>
+        </div>
+
+        <!-- SKILLS -->
+        <div id="tab-skills-content" class="shop-items" style="display:none;">
+          <div class="shop-item skill-item" id="si-skill-morph">
+            <div class="item-top">
+                <div class="item-name">✦ Mino Morph <span id="badge-skill-morph"></span></div>
+                <div class="item-price">$50,000</div>
+            </div>
+            <div class="item-desc">
+                落下中のミノを任意のミノに変換するスキル。プレイ中に <b style="color:#b060ff">Q キー</b> を押すとピッカーが開く。<br>
+                <span style="color:#6040a0;">消費MP: 30 / 最大MP: 100 / 自動回復: 3/秒</span>
+            </div>
+            <button class="item-btn skill-buy" id="btn-skill-morph" onclick="handleSkillPurchase('morph',50000)">BUY SKILL</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <div class="right-panel">
+        <div class="action-card">
+            <div class="panel-title">Game Speed</div>
+            <div class="speed-grid">
+                <button class="speed-btn" id="sp-0" onclick="setSpeed(0)"><span class="mult">x1.0</span>SLOW</button>
+                <button class="speed-btn active" id="sp-1" onclick="setSpeed(1)"><span class="mult">x1.5</span>NORMAL</button>
+                <button class="speed-btn" id="sp-2" onclick="setSpeed(2)"><span class="mult">x2.5</span>FAST</button>
+            </div>
+        </div>
+        <div class="action-card">
+            <div class="panel-title">Equipped Tools <span id="slot-info" style="color:#333;font-size:10px;margin-left:4px;">(Max 1)</span></div>
+            <div class="equipped-box" id="h-equipped"><span class="no-equip">— none —</span></div>
+        </div>
+        <button class="start-btn" onclick="goToGame()">▶ START GAME</button>
+        <div class="action-card">
+            <div class="panel-title">Controls</div>
+            <div class="controls">
+                <div class="ctrl-item"><span class="key">↑ / X</span> 時計回り</div>
+                <div class="ctrl-item"><span class="key">Z</span> 反時計回り</div>
+                <div class="ctrl-item"><span class="key">Space</span> ハードドロップ</div>
+                <div class="ctrl-item"><span class="key">C</span> ホールド</div>
+                <div class="ctrl-item"><span class="key">↓</span> ソフトドロップ</div>
+                <div class="ctrl-item"><span class="key">Q</span> Mino Morph</div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     GAME SCREEN
+══════════════════════════════════════════════ -->
+<div id="game-screen" class="screen">
+
+    <!-- Game over -->
+    <div id="game-over-screen" class="game-overlay">
+        <div class="menu-box-g" style="border-color:#f44;">
+            <h2 style="color:#f44;margin-top:0;">SETTLEMENT</h2>
+            <p style="color:#666;font-size:12px;margin-bottom:4px;">EARNED</p>
+            <div id="earned-money" class="gmoney value" style="font-size:34px;margin:8px 0 22px;">$0</div>
+            <button class="gbtn" onclick="restartGame()">PLAY AGAIN</button>
+            <button class="gbtn gbtn-back" onclick="goHome()">HOME</button>
+        </div>
+    </div>
+
+    <!-- Mino picker -->
+    <div id="mino-picker">
+        <div class="picker-title">✦ MINO MORPH — 変換先を選択 (30 MP)</div>
+        <div class="picker-row" id="picker-row"></div>
+    </div>
+
+    <div class="game-container">
+        <!-- LEFT -->
+        <div class="side-panel">
+            <div class="box">
+                <div class="glabel">WALLET</div>
+                <div id="g-wallet" class="value gmoney">$0</div>
+            </div>
+            <div class="box">
+                <div class="glabel">EQUIPPED</div>
+                <div id="g-equipped" style="font-size:10px;color:#00ff99;min-height:24px;line-height:1.7;">None</div>
+            </div>
+            <!-- MP box -->
+            <div class="box" id="mp-box" style="display:none;">
+                <div class="glabel">MP</div>
+                <div class="mp-text" id="mp-text">0 / 100</div>
+                <div class="mp-bar-wrap"><div class="mp-bar-fill" id="mp-bar" style="width:0%"></div></div>
+                <button class="skill-btn" id="skill-morph-btn" onclick="openMinoPicker()" style="margin-top:8px;">✦ MORPH (Q)</button>
+            </div>
+            <div class="box">
+                <div class="glabel">HOLD</div>
+                <canvas id="hold" class="small" width="72" height="72"></canvas>
+            </div>
+            <button class="home-btn" onclick="goHome()">⌂ HOME</button>
+        </div>
+
+        <canvas id="tetris" width="200" height="400"></canvas>
+
+        <!-- RIGHT -->
+        <div class="side-panel">
+            <div class="box">
+                <div class="glabel">NEXT</div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+                    <canvas id="next-1" class="small" width="52" height="52"></canvas>
+                    <canvas id="next-2" class="small" width="40" height="40" style="opacity:.8"></canvas>
+                    <canvas id="next-3" class="small" width="40" height="40" style="opacity:.6"></canvas>
+                    <canvas id="next-4" class="small" width="40" height="40" style="opacity:.4"></canvas>
+                    <canvas id="next-5" class="small" width="40" height="40" style="opacity:.2;display:none;"></canvas>
+                    <canvas id="next-6" class="small" width="40" height="40" style="opacity:.1;display:none;"></canvas>
+                </div>
+            </div>
+            <div class="box"><div class="glabel">SCORE</div><div id="score-val" class="value">0</div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let wallet        = parseInt(localStorage.getItem('ti_wallet') || '0');
+let ownedTools    = JSON.parse(localStorage.getItem('ti_owned')     || '[]');
+let equippedTools = JSON.parse(localStorage.getItem('ti_equipped')  || '[]');
+let ownedSkills   = JSON.parse(localStorage.getItem('ti_skills')    || '[]');
+let ownedUpgrades = JSON.parse(localStorage.getItem('ti_upgrades')  || '[]');
+let hasDualSlot   = localStorage.getItem('ti_dual')  === 'true';
+let selectedSpeed = parseInt(localStorage.getItem('ti_speed') || '1');
+
+function persist() {
+    localStorage.setItem('ti_wallet',   wallet);
+    localStorage.setItem('ti_owned',    JSON.stringify(ownedTools));
+    localStorage.setItem('ti_equipped', JSON.stringify(equippedTools));
+    localStorage.setItem('ti_skills',   JSON.stringify(ownedSkills));
+    localStorage.setItem('ti_upgrades', JSON.stringify(ownedUpgrades));
+    localStorage.setItem('ti_dual',     hasDualSlot);
+    localStorage.setItem('ti_speed',    selectedSpeed);
+}
+
+// ══════════════════════════════════════════════
+//  SCREEN SWITCH
+// ══════════════════════════════════════════════
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+function goToGame() {
+    updateGameSideUI();
+    showScreen('game-screen');
+    startFreshGame();
+}
+function goHome() {
+    gameState = 'IDLE';
+    closePicker();
+    updateHomeUI();
+    showScreen('home-screen');
+}
+
+// ══════════════════════════════════════════════
+//  HOME: SPEED / TAB
+// ══════════════════════════════════════════════
+function setSpeed(v) {
+    selectedSpeed = v;
+    [0,1,2].forEach(i => document.getElementById('sp-'+i).classList.toggle('active', i===v));
+    persist();
+}
+setSpeed(selectedSpeed);
+
+function switchTab(t) {
+    ['tools','upgrades','skills'].forEach(name => {
+        document.getElementById(`tab-${name}-content`).style.display = (name===t) ? 'flex' : 'none';
+        document.getElementById(`tab-${name}`).classList.toggle('active', name===t);
+    });
+}
+
+// ══════════════════════════════════════════════
+//  HOME: SHOP PURCHASES
+// ══════════════════════════════════════════════
+const TOOL_IDS = ['slow','multi','next6','hold'];
+
+function handlePurchase(id, price) {
+    if (!ownedTools.includes(id)) {
+        if (wallet < price) { shakeWallet(); return; }
+        wallet -= price; ownedTools.push(id);
+    }
+    if (equippedTools.includes(id)) {
+        equippedTools = equippedTools.filter(t => t !== id);
+    } else {
+        const max = hasDualSlot ? 2 : 1;
+        if (equippedTools.length >= max) equippedTools.shift();
+        equippedTools.push(id);
+    }
+    persist(); updateHomeUI();
+}
+
+function handleDual() {
+    if (hasDualSlot) return;
+    if (wallet < 500000) { shakeWallet(); return; }
+    wallet -= 500000; hasDualSlot = true; persist(); updateHomeUI();
+}
+
+function handleUpgrade(id, price) {
+    if (ownedUpgrades.includes(id)) return;
+    if (wallet < price) { shakeWallet(); return; }
+    wallet -= price; ownedUpgrades.push(id); persist(); updateHomeUI();
+}
+
+function handleSkillPurchase(id, price) {
+    if (ownedSkills.includes(id)) return;
+    if (wallet < price) { shakeWallet(); return; }
+    wallet -= price; ownedSkills.push(id); persist(); updateHomeUI();
+}
+
+// ══════════════════════════════════════════════
+//  HOME: UI UPDATE
+// ══════════════════════════════════════════════
+function updateHomeUI() {
+    document.getElementById('h-wallet').innerText = '$' + wallet.toLocaleString();
+    document.getElementById('slot-info').innerText = '(Max '+(hasDualSlot?2:1)+')';
+    const eq = document.getElementById('h-equipped');
+    eq.innerHTML = equippedTools.length === 0
+        ? '<span class="no-equip">— none —</span>'
+        : equippedTools.map(t=>`<div>✦ ${t}</div>`).join('');
+
+    TOOL_IDS.forEach(id => {
+        const si = document.getElementById('si-'+id);
+        const btn = document.getElementById('btn-'+id);
+        const bdg = document.getElementById('badge-'+id);
+        si.classList.remove('owned','equipped'); bdg.innerHTML='';
+        if (equippedTools.includes(id)) {
+            si.classList.add('equipped');
+            bdg.innerHTML='<span class="badge badge-equipped">EQUIPPED</span>';
+            btn.textContent='UNEQUIP'; btn.className='item-btn equipped-btn';
+        } else if (ownedTools.includes(id)) {
+            si.classList.add('owned');
+            bdg.innerHTML='<span class="badge badge-owned">OWNED</span>';
+            btn.textContent='EQUIP'; btn.className='item-btn';
+        } else { btn.textContent='BUY'; btn.className='item-btn'; }
+    });
+
+    // Dual
+    const dBtn=document.getElementById('btn-dual'), dBdg=document.getElementById('badge-dual');
+    if (hasDualSlot) { document.getElementById('si-dual').classList.add('equipped'); dBdg.innerHTML='<span class="badge badge-active">ACTIVE</span>'; dBtn.textContent='INSTALLED'; dBtn.disabled=true; }
+    else { dBtn.disabled=false; dBtn.textContent='UPGRADE'; }
+
+    // MP Accelerator
+    const mBtn=document.getElementById('btn-mpregen'), mBdg=document.getElementById('badge-mpregen');
+    if (ownedUpgrades.includes('mpregen')) { document.getElementById('si-mpregen').classList.add('equipped'); mBdg.innerHTML='<span class="badge badge-active">ACTIVE</span>'; mBtn.textContent='INSTALLED'; mBtn.disabled=true; }
+    else { mBtn.disabled=false; mBtn.textContent='UPGRADE'; }
+
+    // Mino Morph skill
+    const skBtn=document.getElementById('btn-skill-morph'), skBdg=document.getElementById('badge-skill-morph');
+    if (ownedSkills.includes('morph')) { document.getElementById('si-skill-morph').classList.add('owned'); skBdg.innerHTML='<span class="badge badge-skill">OWNED</span>'; skBtn.textContent='PURCHASED'; skBtn.disabled=true; }
+    else { skBtn.disabled=false; skBtn.textContent='BUY SKILL'; }
+}
+updateHomeUI();
+
+function shakeWallet() {
+    const el=document.getElementById('h-wallet');
+    el.style.color='#f44'; el.style.transform='translateX(-6px)';
+    setTimeout(()=>el.style.transform='translateX(6px)',80);
+    setTimeout(()=>el.style.transform='translateX(-4px)',160);
+    setTimeout(()=>{el.style.transform='translateX(0)';el.style.color='#ffd93d';},260);
+}
+
+// Dev tools
+let logoClicks=0;
+document.getElementById('logo-click').addEventListener('click',()=>{
+    if(++logoClicks>=3){logoClicks=0;document.getElementById('pass-overlay').classList.add('show');}
+});
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function checkPassword(){
+    if(document.getElementById('dev-pass').value==='km778695'){
+        closeModal('pass-overlay');
+        document.getElementById('dev-money-input').value=wallet;
+        document.getElementById('dev-overlay').classList.add('show');
+    }else{alert('WRONG');}
+}
+function saveDevMoney(){
+    wallet=parseInt(document.getElementById('dev-money-input').value)||0;
+    persist();updateHomeUI();closeModal('dev-overlay');
+}
+
+// ══════════════════════════════════════════════
+//  TETRIS ENGINE
+// ══════════════════════════════════════════════
+const canvas   = document.getElementById('tetris');
+const context  = canvas.getContext('2d');
+const nextCtxs = Array.from({length:6},(_,i)=>document.getElementById(`next-${i+1}`).getContext('2d'));
+const hCtx     = document.getElementById('hold').getContext('2d');
+context.scale(20,20); nextCtxs.forEach(c=>c.scale(12,12)); hCtx.scale(18,18);
+
+const COLORS = [null,'#00FFFF','#FFFF00','#A000F0','#00F000','#F00000','#0000F0','#F0A000'];
+const TYPES  = ['I','O','T','S','Z','J','L'];
+const speedMultipliers = [1.0,1.5,2.5];
+const baseIntervals    = [1200,800,400];
+
+// MP
+const MP_MAX  = 100;
+const MP_COST = 30;
+let mp        = MP_MAX;
+let mpTimer   = 0;
+
+let gameState = 'IDLE';
+let score=0;
+let arena = Array.from({length:20},()=>Array(10).fill(0));
+let player = {pos:{x:3,y:0},matrix:null,type:null};
+let holdPiece=null, canHold=true, nextQueue=[], bag=[];
+let dropCounter=0, lastTime=0, rafId=null;
+let pickerOpen=false;
+
+// ── MP helpers ────────────────────────────────
+function mpRegenRate() {
+    return ownedUpgrades.includes('mpregen') ? 6 : 3; // per second
+}
+function updateMPBar() {
+    const pct = (mp/MP_MAX)*100;
+    document.getElementById('mp-bar').style.width = pct+'%';
+    document.getElementById('mp-text').innerText  = Math.floor(mp)+' / '+MP_MAX;
+    const btn = document.getElementById('skill-morph-btn');
+    if (btn) btn.disabled = (mp < MP_COST);
+}
+
+// ── Game side UI ──────────────────────────────
+function updateGameSideUI() {
+    const hasMorph = ownedSkills.includes('morph');
+    document.getElementById('mp-box').style.display = hasMorph ? 'block' : 'none';
+    document.getElementById('g-wallet').innerText = '$'+wallet.toLocaleString();
+    document.getElementById('g-equipped').innerText = equippedTools.length>0 ? equippedTools.join('\n') : 'None';
+    document.getElementById('next-5').style.display = equippedTools.includes('next6') ? 'block' : 'none';
+    document.getElementById('next-6').style.display = equippedTools.includes('next6') ? 'block' : 'none';
+    updateMPBar();
+}
+
+// ── Start / Restart ───────────────────────────
+function startFreshGame() {
+    if(rafId) cancelAnimationFrame(rafId);
+    arena.forEach(r=>r.fill(0));
+    score=0; holdPiece=null; nextQueue=[]; bag=[]; canHold=true;
+    dropCounter=0; lastTime=0;
+    mp = MP_MAX; mpTimer=0;
+    pickerOpen=false;
+    document.getElementById('score-val').innerText='0';
+    document.getElementById('game-over-screen').style.display='none';
+    closePicker();
+    gameState='PLAYING';
+    playerReset();
+    updateMPBar();
+    rafId=requestAnimationFrame(update);
+}
+function restartGame(){ updateGameSideUI(); startFreshGame(); }
+
+function handleGameOver() {
+    gameState='GAMEOVER'; closePicker();
+    let multi=speedMultipliers[selectedSpeed];
+    if(equippedTools.includes('multi')) multi*=2.0;
+    const earned=Math.floor(score*multi);
+    wallet+=earned; persist();
+    document.getElementById('g-wallet').innerText='$'+wallet.toLocaleString();
+    document.getElementById('earned-money').innerText='$'+earned.toLocaleString();
+    document.getElementById('game-over-screen').style.display='flex';
+}
+
+// ── Pieces ────────────────────────────────────
+function createPiece(type) {
+    if(type==='I') return [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]];
+    if(type==='O') return [[2,2],[2,2]];
+    if(type==='T') return [[0,3,0],[3,3,3],[0,0,0]];
+    if(type==='S') return [[0,4,4],[4,4,0],[0,0,0]];
+    if(type==='Z') return [[5,5,0],[0,5,5],[0,0,0]];
+    if(type==='J') return [[6,0,0],[6,6,6],[0,0,0]];
+    if(type==='L') return [[0,0,7],[7,7,7],[0,0,0]];
+}
+function fillQueue() {
+    const target=equippedTools.includes('next6')?7:5;
+    while(nextQueue.length<target){
+        if(bag.length===0){
+            bag=[...TYPES];
+            for(let i=bag.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[bag[i],bag[j]]=[bag[j],bag[i]];}
+        }
+        nextQueue.push(bag.pop());
+    }
+}
+function collide(arena,p){
+    const[m,o]=[p.matrix,p.pos];
+    for(let y=0;y<m.length;y++) for(let x=0;x<m[y].length;x++)
+        if(m[y][x]!==0&&(arena[y+o.y]===undefined||arena[y+o.y][x+o.x]===undefined||arena[y+o.y][x+o.x]!==0)) return true;
+    return false;
+}
+function playerReset(){
+    fillQueue();
+    player.type=nextQueue.shift(); player.matrix=createPiece(player.type);
+    player.pos.y=0; player.pos.x=3;
+    if(collide(arena,player)) handleGameOver();
+    fillQueue();
+}
+function drawMatrix(m,o,dc,isGhost=false){
+    m.forEach((row,y)=>row.forEach((v,x)=>{
+        if(v!==0){dc.fillStyle=isGhost?'rgba(255,255,255,0.11)':COLORS[v];dc.fillRect(x+o.x,y+o.y,1,1);}
+    }));
+}
+function draw(){
+    context.fillStyle='#000'; context.fillRect(0,0,canvas.width,canvas.height);
+    if(gameState==='PLAYING'||gameState==='GAMEOVER'){
+        let gy=player.pos.y;
+        while(!collide(arena,{...player,pos:{x:player.pos.x,y:gy+1}})) gy++;
+        drawMatrix(player.matrix,{x:player.pos.x,y:gy},context,true);
+        drawMatrix(arena,{x:0,y:0},context);
+        drawMatrix(player.matrix,player.pos,context);
+    }
+    hCtx.fillStyle='#050508'; hCtx.fillRect(0,0,4,4);
+    if(holdPiece) drawMatrix(holdPiece,{x:0,y:0},hCtx);
+    nextCtxs.forEach((c,i)=>{c.fillStyle='#050508';c.fillRect(0,0,5,5);if(nextQueue[i])drawMatrix(createPiece(nextQueue[i]),{x:0,y:0},c);});
+}
+function playerRotate(dir){
+    const backup=player.matrix.map(r=>[...r]);
+    for(let y=0;y<player.matrix.length;y++) for(let x=0;x<y;x++) [player.matrix[x][y],player.matrix[y][x]]=[player.matrix[y][x],player.matrix[x][y]];
+    if(dir>0) player.matrix.forEach(r=>r.reverse()); else player.matrix.reverse();
+    if(collide(arena,player)) player.matrix=backup;
+}
+function merge(){player.matrix.forEach((r,y)=>r.forEach((v,x)=>{if(v!==0)arena[y+player.pos.y][x+player.pos.x]=v;}));}
+function arenaSweep(){
+    let rows=0;
+    outer: for(let y=arena.length-1;y>=0;y--){
+        for(let x=0;x<arena[y].length;x++) if(arena[y][x]===0) continue outer;
+        arena.splice(y,1); arena.unshift(new Array(10).fill(0)); rows++; y++;
+    }
+    if(rows>0){score+=[0,100,300,500,800][rows];document.getElementById('score-val').innerText=score;}
+}
+
+// ── Mino Morph Skill ─────────────────────────
+function buildPickerUI() {
+    const row = document.getElementById('picker-row');
+    row.innerHTML = '';
+    TYPES.forEach(type => {
+        if (type === player.type) return; // skip current
+        const wrap = document.createElement('div');
+        wrap.className = 'mino-choice';
+        wrap.title = type;
+        const c = document.createElement('canvas');
+        c.width=48; c.height=48;
+        const dctx = c.getContext('2d');
+        dctx.scale(12,12);
+        const m = createPiece(type);
+        drawMatrix(m,{x:0,y:0},dctx);
+        wrap.appendChild(c);
+        wrap.addEventListener('click',()=>applyMorph(type));
+        row.appendChild(wrap);
+    });
+}
+
+function openMinoPicker() {
+    if (!ownedSkills.includes('morph')) return;
+    if (gameState !== 'PLAYING') return;
+    if (mp < MP_COST) return;
+    pickerOpen = true;
+    buildPickerUI();
+    document.getElementById('mino-picker').style.display = 'block';
+}
+
+function closePicker() {
+    pickerOpen = false;
+    document.getElementById('mino-picker').style.display = 'none';
+}
+
+function applyMorph(type) {
+    if (mp < MP_COST) { closePicker(); return; }
+    mp = Math.max(0, mp - MP_COST);
+    // Change current piece to chosen type, keep position
+    player.type   = type;
+    player.matrix = createPiece(type);
+    // If new piece collides at current pos, try to nudge up
+    let attempts=0;
+    while(collide(arena,player)&&attempts<3){player.pos.y--;attempts++;}
+    updateMPBar();
+    closePicker();
+}
+
+// ── Input ─────────────────────────────────────
+window.addEventListener('keydown',e=>{
+    if(gameState!=='PLAYING') return;
+
+    // Close picker on Escape
+    if(e.key==='Escape'&&pickerOpen){closePicker();return;}
+    // Mino Morph: Q key
+    if((e.key==='q'||e.key==='Q')&&!pickerOpen){openMinoPicker();return;}
+    // Select mino by number while picker open
+    if(pickerOpen){
+        const n=parseInt(e.key);
+        if(n>=1&&n<=7){const t=TYPES.filter(t=>t!==player.type)[n-1];if(t)applyMorph(t);}
+        return;
+    }
+
+    if(e.keyCode===38||e.keyCode===88) playerRotate(1);
+    if(e.keyCode===90) playerRotate(-1);
+    if(e.keyCode===32){e.preventDefault();while(!collide(arena,player))player.pos.y++;player.pos.y--;merge();playerReset();arenaSweep();canHold=true;}
+    if(e.keyCode===67){
+        if(!canHold&&!equippedTools.includes('hold')) return;
+        if(!holdPiece){holdPiece=createPiece(player.type);playerReset();}
+        else{const t=holdPiece;holdPiece=createPiece(player.type);player.matrix=t;player.pos.y=0;player.pos.x=3;}
+        canHold=false;
+    }
+    if(e.keyCode===37){player.pos.x--;if(collide(arena,player))player.pos.x++;}
+    if(e.keyCode===39){player.pos.x++;if(collide(arena,player))player.pos.x--;}
+});
+
+// ── Game loop ─────────────────────────────────
+function update(time=0){
+    const dt=Math.min(time-lastTime,100); lastTime=time;
+    if(gameState==='PLAYING'&&!pickerOpen){
+        // MP regen
+        mpTimer+=dt;
+        const regenInterval=1000/mpRegenRate();
+        while(mpTimer>=regenInterval){
+            mp=Math.min(MP_MAX,mp+1);
+            mpTimer-=regenInterval;
+        }
+        updateMPBar();
+
+        // Drop
+        let base=baseIntervals[selectedSpeed];
+        if(equippedTools.includes('slow')) base+=400;
+        let interval=Math.max(80,base-(Math.floor(score/1500)*60));
+        dropCounter+=dt;
+        if(dropCounter>interval){
+            player.pos.y++;
+            if(collide(arena,player)){player.pos.y--;merge();playerReset();arenaSweep();canHold=true;}
+            dropCounter=0;
+        }
+    }
+    draw();
+    rafId=requestAnimationFrame(update);
+}
+</script>
+</body>
+</html>
